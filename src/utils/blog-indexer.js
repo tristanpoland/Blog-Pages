@@ -1,9 +1,9 @@
 // src/utils/blog-indexer.js
 // This module handles scanning markdown files, extracting metadata, and building the JSON index
 
-const fs = require('fs');
-const path = require('path');
-const matter = require('gray-matter');
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
 
 // Constants
 const BLOGS_DIRECTORY = path.join(process.cwd(), 'public/blogs');

@@ -1,6 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const matter = require('gray-matter');
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
 
 const BLOGS_DIRECTORY = path.join(process.cwd(), 'public/blogs');
 const BLOG_INDEX_PATH = path.join(process.cwd(), 'public/blog-index.json');
