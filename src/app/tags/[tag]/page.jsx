@@ -3,8 +3,8 @@ import BlogPost from '../../../components/BlogPost';
 import Link from 'next/link';
 
 export async function generateStaticParams() {
-  const tags = getAllTags();
-  return tags.map((tag) => ({ tag }));
+  const tags = await getAllTags();
+  return Array.isArray(tags) ? tags.map((tag) => ({ tag })) : [];
 }
 
 export async function generateMetadata(context) {

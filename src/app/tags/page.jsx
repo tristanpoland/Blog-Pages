@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getAllTags } from '../../utils/markdown';
 
 export default function TagsPage() {
-  const tags = Array.isArray(getAllTags()) ? getAllTags() : [];
+  const tags = Array.isArray(getAllTags()) ? getAllTags() : (getAllTags() ? [getAllTags()] : []);
 
   return (
     <div className="max-w-4xl mx-auto">

@@ -49,6 +49,4 @@ function parseBlogPosts() {
   return blogPosts;
 }
 
-module.exports = {
-  parseBlogPosts
-};
+export { parseBlogPosts };
