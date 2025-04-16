@@ -1,3 +1,10 @@
+---
+title: "Advanced Renderer Test"
+date: "2025-04-16"
+tags: ["mathematics", "renderer", "test", "LaTeX"]
+excerpt: "A comprehensive test document for the enhanced MarkdownRenderer with improved math support."
+---
+
 # Ultimate Markdown Test File
 
 This document demonstrates all the Markdown features supported by the renderer.
