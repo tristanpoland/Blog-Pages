@@ -22,7 +22,7 @@
       "hooks"
     ],
     "excerpt": "\r\n# React Hooks Explained: useEffect, useState, and More\r\n\r\nReact Hooks have revolutionized how we write React components. In this post, we'll explore...",
-    "readingTime": 2,
+    "readingTime": 3,
     "fileName": "react-hooks-explained.md"
   }
 ]

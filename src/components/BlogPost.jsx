@@ -16,13 +16,12 @@ export default function BlogPost({ post }) {
       {post.tags && (
         <div className="flex flex-wrap gap-2 mb-4">
           {post.tags.map(tag => (
-            <Link 
+            <span 
               key={tag} 
-              href={`/tags/${tag}`}
               className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm"
             >
               {tag}
-            </Link>
+            </span>
           ))}
         </div>
       )}

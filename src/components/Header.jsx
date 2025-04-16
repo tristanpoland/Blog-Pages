@@ -18,9 +18,9 @@ export default function Header() {
             <Link href="/" className="mx-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400">
               Home
             </Link>
-            <Link href="/tags" className="mx-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400">
+            {/* <Link href="/tags" className="mx-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400">
               Tags
-            </Link>
+            </Link> */}
             <Link href="/about" className="mx-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400">
               About
             </Link>
