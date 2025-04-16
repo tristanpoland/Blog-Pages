@@ -84,16 +84,6 @@ body {
   border-bottom-left-radius: 0.25rem;
 }
 
-pre {
-  border-radius: 0.5rem;
-  padding: 1rem;
-  overflow-x: auto;
-  background-color: rgb(30, 30, 30);
-  color: var(--tw-prose-pre-code);
-  font-size: 0.875rem;
-  line-height: 1.7;
-}
-
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

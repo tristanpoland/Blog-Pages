@@ -1,245 +1,337 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkMath from 'remark-math';
+import React, { useState, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkRehype from 'remark-rehype';
+import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeStringify from 'rehype-stringify';
-import rehypePrism from 'rehype-prism-plus';
-import rehypeSlug from 'rehype-slug';
-import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import 'katex/dist/katex.min.css';
-import 'prismjs/themes/prism-tomorrow.css';
-import { visit } from 'unist-util-visit';
-
-// Import Prism - but don't access window during import
-import Prism from 'prismjs';
-
-// Core languages
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-jsx';
-import 'prismjs/components/prism-tsx';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-csharp';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-ruby';
-import 'prismjs/components/prism-php';
-import 'prismjs/components/prism-swift';
-import 'prismjs/components/prism-kotlin';
-import 'prismjs/components/prism-scala';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/components/prism-graphql';
-import 'prismjs/components/prism-regex';
-
-// Safe browser-only functionality
-const isBrowser = typeof window !== 'undefined';
 
 export default function MarkdownRenderer({ 
   content, 
-  darkMode = true,
+  darkMode = true
 }) {
-  const [html, setHtml] = useState('');
+  const [copied, setCopied] = useState({});
   const [isMounted, setIsMounted] = useState(false);
   
-  // Set isMounted to true once component mounts (client-side only)
+  // Set isMounted to true when component is mounted on client
   useEffect(() => {
     setIsMounted(true);
   }, []);
   
-  // Initialize PrismJS - only in browser
+  // Handle copying code to clipboard
+  const handleCopyCode = useCallback((code, id) => {
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(code).then(() => {
+        // Use a more targeted state update to avoid re-rendering Mermaid diagrams
+        setCopied(prev => {
+          const newState = { ...prev };
+          newState[id] = true;
+          return newState;
+        });
+        
+        setTimeout(() => {
+          // Use a more targeted state update to avoid re-rendering Mermaid diagrams
+          setCopied(prev => {
+            const newState = { ...prev };
+            newState[id] = false;
+            return newState;
+          });
+        }, 2000);
+      });
+    }
+  }, []);
+
+  // Initialize mermaid when the component mounts
   useEffect(() => {
     if (!isMounted) return;
     
-    // Safe to access window/document here
-    try {
-      // Log available languages - only in browser
-      console.log('Available languages:', Object.keys(Prism.languages));
-      
-      // Apply highlighting to any existing code
-      Prism.highlightAll();
-    } catch (error) {
-      console.error('Error initializing Prism:', error);
-    }
-  }, [isMounted]);
-
-  useEffect(() => {
-    if (!content) return;
-    
-    const processMarkdown = async () => {
+    const initMermaid = async () => {
       try {
-        // Create a remark plugin to handle mermaid code blocks
-        function remarkMermaid() {
-          return (tree) => {
-            const mermaidBlocks = [];
-            let mermaidCounter = 0;
-            
-            // Visit all code blocks in the AST
-            visit(tree, 'code', (node) => {
-              // Check if this is a mermaid code block
-              if (node.lang === 'mermaid') {
-                // Generate a unique ID for this mermaid diagram
-                const id = `mermaid-${mermaidCounter++}`;
-                
-                // Store the mermaid code for later processing
-                mermaidBlocks.push({ id, code: node.value.trim() });
-                
-                // Replace the code node with a HTML node containing a placeholder
-                node.type = 'html';
-                node.value = `<div class="mermaid-diagram" data-diagram-id="${id}" data-diagram-code="${encodeURIComponent(node.value.trim())}"></div>`;
-                
-                // Remove the language property to prevent further processing by rehype-prism
-                delete node.lang;
-              }
-              // Ensure other code blocks have a language
-              else if (!node.lang) {
-                node.lang = 'text';
-              }
-            });
-            
-            // Store the mermaid blocks in the tree.data
-            tree.data = tree.data || {};
-            tree.data.mermaidBlocks = mermaidBlocks;
-          };
-        }
-        
-        const processor = unified()
-          .use(remarkParse)
-          .use(remarkGfm)
-          .use(remarkMath)
-          .use(remarkMermaid) // Add our custom plugin
-          .use(remarkRehype, { allowDangerousHtml: true })
-          .use(rehypeSanitize, {
-            // Allow our mermaid placeholders
-            extend: [
-              {
-                tagNames: ['div'],
-                attributes: {
-                  'class': ['mermaid-diagram'],
-                  'data-diagram-id': [/.*/],
-                  'data-diagram-code': [/.*/]
-                }
-              }
-            ]
-          })
-          .use(rehypeKatex, { 
-            throwOnError: false,
-            errorColor: '#FF6188',
-            trust: true,
-            strict: false,
-            output: 'htmlAndMathml',
-            macros: {
-              "\\R": "\\mathbb{R}",
-              "\\N": "\\mathbb{N}",
-              "\\Z": "\\mathbb{Z}",
-              "\\Q": "\\mathbb{Q}",
-              "\\C": "\\mathbb{C}",
-            }
-          })
-          .use(rehypePrism, {
-            ignoreMissing: true, // Skip unknown languages
-          })
-          .use(rehypeSlug)
-          .use(rehypeAutolinkHeadings)
-          .use(rehypeStringify, { allowDangerousHtml: true });
-          
-        const result = await processor.process(content);
-          
-        // Get mermaid blocks from the result data
-        const mermaidBlocks = result.data.mermaidBlocks || [];
-        
-        // Process custom containers
-        let htmlContent = String(result);
-        const containerRegex = /<p>:::\s*(\w+)([\s\S]*?):::<\/p>/g;
-        
-        htmlContent = htmlContent.replace(containerRegex, (match, type, content) => {
-          return `<div class="custom-block custom-block-${type}">
-                    <div class="custom-block-title">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
-                    <div class="custom-block-content">${content.trim()}</div>
-                  </div>`;
-        });
-        
-        // Store the HTML and mermaid blocks
-        setHtml({ content: htmlContent, mermaidBlocks });
-      } catch (error) {
-        console.error('Error rendering markdown:', error);
-        setHtml({ 
-          content: `<p>Error rendering markdown: ${error.message}</p>`, 
-          mermaidBlocks: [] 
-        });
-      }
-    };
-    
-    processMarkdown();
-  }, [content]);
-  
-  // Initialize mermaid and render diagrams - only in browser and when component is mounted
-  useEffect(() => {
-    if (!isMounted || !html?.content || !html?.mermaidBlocks?.length) return;
-    
-    const renderMermaidDiagrams = async () => {
-      try {
-        // Dynamic import of mermaid (only on client)
         const mermaid = (await import('mermaid')).default;
         
         mermaid.initialize({
-          startOnLoad: false,
+          startOnLoad: false, // Changed to false to prevent auto initialization
           theme: darkMode ? 'dark' : 'default',
           securityLevel: 'loose',
           fontFamily: 'inherit',
         });
         
-        // Find all mermaid diagram containers
-        const diagrams = document.querySelectorAll('.mermaid-diagram');
-        
-        for (const diagram of diagrams) {
+        // Create a dedicated function for rendering Mermaid diagrams
+        const renderMermaidDiagrams = () => {
           try {
-            const code = decodeURIComponent(diagram.getAttribute('data-diagram-code'));
-            const id = diagram.getAttribute('data-diagram-id');
+            // Find all mermaid divs that don't have an svg child (not yet rendered)
+            const mermaidDivs = document.querySelectorAll('div.mermaid:not(:has(svg))');
             
-            // Render the diagram
-            const { svg } = await mermaid.render(`mermaid-svg-${id}`, code);
-            diagram.innerHTML = svg;
+            if (mermaidDivs.length > 0) {
+              console.log(`Rendering ${mermaidDivs.length} Mermaid diagrams`);
+              
+              // Use run() instead of contentLoaded() for more reliable rendering
+              mermaid.run({
+                querySelector: 'div.mermaid:not(:has(svg))',
+              }).catch(err => {
+                console.error('Error rendering Mermaid diagrams:', err);
+              });
+            }
           } catch (error) {
-            console.error('Error rendering mermaid diagram:', error);
-            diagram.innerHTML = `<pre class="error">Error rendering diagram: ${error.message}</pre>`;
+            console.error('Error in renderMermaidDiagrams:', error);
           }
-        }
+        };
+        
+        // Initial render
+        renderMermaidDiagrams();
+        
+        // Set up a MutationObserver to watch for DOM changes
+        const observer = new MutationObserver((mutations) => {
+          // Check if any mutations affect mermaid containers or their children
+          const shouldRerender = mutations.some(mutation => {
+            // Check if the mutation target is a mermaid container or contains one
+            return mutation.target.classList?.contains('mermaid') ||
+                   mutation.target.querySelector?.('.mermaid') ||
+                   [...(mutation.addedNodes || [])].some(node => 
+                     node.classList?.contains('mermaid') || 
+                     node.querySelector?.('.mermaid')
+                   );
+          });
+          
+          if (shouldRerender) {
+            // Schedule rendering in the next animation frame
+            window.requestAnimationFrame(renderMermaidDiagrams);
+          }
+        });
+        
+        // Start observing the document with the configured parameters
+        observer.observe(document.body, { 
+          childList: true, 
+          subtree: true,
+          attributes: true
+        });
+        
+        // Clean up the observer when the component unmounts
+        return () => {
+          observer.disconnect();
+        };
       } catch (error) {
-        console.error('Error loading mermaid:', error);
+        console.error('Error initializing mermaid:', error);
       }
     };
     
-    renderMermaidDiagrams();
+    initMermaid();
+  }, [isMounted, darkMode]);
+
+  // Process custom containers after ReactMarkdown has rendered
+  useEffect(() => {
+    if (!isMounted) return;
     
-    // Also ensure Prism highlight is applied
-    if (typeof Prism !== 'undefined') {
-      setTimeout(() => {
-        Prism.highlightAll();
-      }, 100);
-    }
-  }, [html, isMounted, darkMode]);
-  
+    // Create a function that's safe to call multiple times
+    const processCustomContainers = () => {
+      try {
+        const markdownContent = document.querySelector('.markdown-content');
+        if (!markdownContent) return;
+        
+        // Find all container start markers like ::: info
+        // that haven't already been processed (look for those without a custom-block parent)
+        const containerStarts = Array.from(markdownContent.querySelectorAll('p'))
+          .filter(p => 
+            /^:::(\s+)?([a-zA-Z0-9_-]+)/.test(p.textContent.trim()) && 
+            !p.closest('.custom-block')
+          );
+        
+        if (containerStarts.length === 0) return;
+        
+        // Track if we made any changes
+        let changesMade = false;
+        
+        containerStarts.forEach(startP => {
+          const match = startP.textContent.trim().match(/^:::(\s+)?([a-zA-Z0-9_-]+)/);
+          if (!match) return;
+          
+          const type = match[2];
+          let currentNode = startP.nextSibling;
+          const nodesToWrap = [];
+          let endNodeFound = false;
+          
+          // Collect all nodes until we find the closing marker
+          while (currentNode) {
+            if (currentNode.nodeType === 1 && 
+                currentNode.tagName === 'P' && 
+                currentNode.textContent.trim() === ':::') {
+              // Found the closing marker
+              endNodeFound = true;
+              const endNode = currentNode;
+              
+              // Clone the nodes to wrap to prevent issues with removing them from the DOM
+              const clonedNodes = nodesToWrap.map(node => node.cloneNode(true));
+              
+              // Create container
+              const container = document.createElement('div');
+              container.className = `custom-block custom-block-${type}`;
+              
+              // Add title
+              const title = document.createElement('div');
+              title.className = 'custom-block-title';
+              title.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+              container.appendChild(title);
+              
+              // Add content
+              const content = document.createElement('div');
+              content.className = 'custom-block-content';
+              clonedNodes.forEach(node => content.appendChild(node));
+              container.appendChild(content);
+              
+              // Insert container before the end marker
+              endNode.parentNode.insertBefore(container, endNode);
+              
+              // Remove the original nodes now that they've been cloned and added to the container
+              nodesToWrap.forEach(node => {
+                if (node.parentNode) {
+                  node.parentNode.removeChild(node);
+                }
+              });
+              
+              // Remove start and end markers
+              if (startP.parentNode) startP.parentNode.removeChild(startP);
+              if (endNode.parentNode) endNode.parentNode.removeChild(endNode);
+              
+              changesMade = true;
+              break;
+            } else {
+              // Add this node to the list to wrap
+              const nextNode = currentNode.nextSibling;
+              nodesToWrap.push(currentNode);
+              currentNode = nextNode;
+            }
+          }
+          
+          // If we didn't find an end node, clean up any temporary state
+          if (!endNodeFound) {
+            console.warn('No closing ::: found for container', type);
+          }
+        });
+        
+        // If we made changes, trigger Mermaid to re-render the diagrams
+        // but don't do this by re-calling the function directly to avoid infinite loops
+        if (changesMade) {
+          console.log('Custom containers processed, triggering Mermaid rendering');
+          
+          // Dispatch a custom event that our Mermaid observer can listen for
+          const event = new CustomEvent('custom-containers-processed');
+          document.dispatchEvent(event);
+        }
+      } catch (error) {
+        console.error('Error processing custom containers:', error);
+      }
+    };
+    
+    // Run initially after a small delay to ensure ReactMarkdown has rendered
+    const initialTimer = setTimeout(processCustomContainers, 100);
+    
+    // Set up a MutationObserver to detect content changes
+    const observer = new MutationObserver((mutations) => {
+      // Only process if there might be custom containers to handle
+      const hasRelevantChanges = mutations.some(mutation => 
+        [...(mutation.addedNodes || [])].some(node => 
+          node.nodeType === 1 && 
+          (node.tagName === 'P' || node.querySelector?.('p'))
+        )
+      );
+      
+      if (hasRelevantChanges) {
+        // Debounce the processing to avoid multiple rapid updates
+        clearTimeout(processTimer);
+        processTimer = setTimeout(processCustomContainers, 50);
+      }
+    });
+    
+    let processTimer;
+    
+    // Start observing the document
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Cleanup
+    return () => {
+      clearTimeout(initialTimer);
+      clearTimeout(processTimer);
+      observer.disconnect();
+    };
+  }, [isMounted]); // Remove content dependency to avoid reprocessing on every content change
+
+  if (!content) return null;
+
+  // Choose syntax highlighting theme based on dark mode
+  const codeStyle = darkMode ? vscDarkPlus : prism;
+
+  // Only render ReactMarkdown on the client side
   return (
     <div className={`markdown-content ${darkMode ? 'dark-theme' : 'light-theme'}`}>
-      <div 
-        className="prose prose-lg dark:prose-invert max-w-none" 
-        dangerouslySetInnerHTML={{ __html: html ? html.content : '' }}
-      />
+      {isMounted ? (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+          components={{
+            // Handle code blocks with syntax highlighting and Mermaid diagrams
+            code({ node, inline, className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || '');
+              const language = match ? match[1] : null;
+              const codeContent = String(children).replace(/\n$/, '');
+              const codeId = `code-${Math.random().toString(36).substring(2, 9)}`;
+              
+              // Handle Mermaid diagrams
+              if (language === 'mermaid') {
+                return (
+                  <div className="mermaid-diagram-container">
+                    <div className="mermaid">{codeContent}</div>
+                  </div>
+                );
+              }
+              
+              // Handle regular code blocks
+              if (!inline && language) {
+                return (
+                  <div className="code-block-container">
+                    <div className="code-header">
+                      <span className="language-badge">{language}</span>
+                      <button
+                        onClick={() => handleCopyCode(codeContent, codeId)}
+                        className="copy-button"
+                      >
+                        {copied[codeId] ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <SyntaxHighlighter
+                      style={codeStyle}
+                      language={language}
+                      PreTag="div"
+                      showLineNumbers={language !== 'markdown'}
+                      {...props}
+                    >
+                      {codeContent}
+                    </SyntaxHighlighter>
+                  </div>
+                );
+              }
+              
+              // Inline code
+              return (
+                <code className={`${className || ''} inline-code`} {...props}>
+                  {children}
+                </code>
+              );
+            },
+          }}
+        >
+          {content}
+        </ReactMarkdown>
+      ) : (
+        <div>Loading Markdown Content and Renderer...</div>
+      )}
       
       <style jsx global>{`
         /* Math styling */
@@ -259,42 +351,57 @@ export default function MarkdownRenderer({
           color: #e4e4e7;
         }
         
+        /* Code block styling */
+        .code-block-container {
+          margin: 1.5em 0;
+          border-radius: 0.5em;
+          overflow: hidden;
+          border: 1px solid ${darkMode ? '#444' : '#ddd'};
+        }
+        
+        .code-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5em 1em;
+          background-color: ${darkMode ? '#343434' : '#f3f3f3'};
+          border-bottom: 1px solid ${darkMode ? '#444' : '#ddd'};
+        }
+        
+        .language-badge {
+          font-size: 0.8em;
+          color: ${darkMode ? '#bbb' : '#555'};
+        }
+        
+        .copy-button {
+          font-size: 0.8em;
+          padding: 0.25em 0.5em;
+          background-color: ${darkMode ? '#555' : '#ddd'};
+          border: none;
+          border-radius: 0.25em;
+          color: ${darkMode ? '#eee' : '#333'};
+          cursor: pointer;
+        }
+        
+        .copy-button:hover {
+          background-color: ${darkMode ? '#666' : '#ccc'};
+        }
+        
+        /* Inline code */
+        .inline-code {
+          background-color: ${darkMode ? '#2d2d2d' : '#f1f1f1'};
+          border-radius: 0.25em;
+          padding: 0.2em 0.4em;
+          font-family: monospace;
+        }
+        
         /* Mermaid styling */
-        .mermaid-diagram {
+        .mermaid-diagram-container {
           margin: 1.5em 0;
           text-align: center;
           background-color: ${darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'};
           padding: 1em;
           border-radius: 0.5em;
-          min-height: 50px;
-        }
-        
-        /* Code block styling */
-        pre[class*="language-"] {
-          margin: 1.5em 0;
-          border-radius: 0.5em;
-          overflow: auto;
-          background: ${darkMode ? '#282a36' : '#f8f8f2'} !important;
-        }
-        
-        code[class*="language-"] {
-          font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-          text-shadow: none;
-        }
-        
-        /* Explicit token styling for backup if Prism fails */
-        .token.comment { color: #6272a4; }
-        .token.string { color: ${darkMode ? '#f1fa8c' : '#a6e22e'}; }
-        .token.number { color: #bd93f9; }
-        .token.keyword { color: #ff79c6; }
-        .token.function { color: #8be9fd; }
-        .token.boolean { color: #bd93f9; }
-        .token.operator { color: #ff79c6; }
-        .token.punctuation { color: #f8f8f2; }
-        
-        /* Line numbers */
-        .line-numbers .line-numbers-rows {
-          border-right: 3px solid #6272a4;
         }
         
         /* Custom containers */
@@ -329,14 +436,6 @@ export default function MarkdownRenderer({
         .custom-block.custom-block-success { 
           border-color: #2ecc71; 
           background-color: ${darkMode ? 'rgba(46, 204, 113, 0.2)' : 'rgba(46, 204, 113, 0.1)'}; 
-        }
-        
-        /* Error styling */
-        .error {
-          color: #e74c3c;
-          padding: 0.5em;
-          background-color: rgba(231, 76, 60, 0.1);
-          border-radius: 0.3em;
         }
       `}</style>
     </div>
