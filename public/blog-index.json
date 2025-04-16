@@ -8,7 +8,7 @@
       "javascript",
       "hooks"
     ],
-    "excerpt": "\n\n__Advertisement :)__\n\n- __[pica](https://nodeca.github.io/pica/demo/)__ - high quality and fast image\n  resize in browser.\n- __[babelfish](https://g...",
+    "excerpt": "\r\n\r\n__Advertisement :)__\r\n\r\n- __[pica](https://nodeca.github.io/pica/demo/)__ - high quality and fast image\r\n  resize in browser.\r\n- __[babelfish](htt...",
     "readingTime": 3,
     "fileName": "hello-world.md"
   },
@@ -21,7 +21,7 @@
       "javascript",
       "hooks"
     ],
-    "excerpt": "\n# React Hooks Explained: useEffect, useState, and More\n\nReact Hooks have revolutionized how we write React components. In this post, we'll explore th...",
+    "excerpt": "\r\n# React Hooks Explained: useEffect, useState, and More\r\n\r\nReact Hooks have revolutionized how we write React components. In this post, we'll explore...",
     "readingTime": 2,
     "fileName": "react-hooks-explained.md"
   }
