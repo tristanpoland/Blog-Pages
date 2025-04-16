@@ -10,6 +10,18 @@ import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/cjs/styles/pri
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import 'katex/dist/katex.min.css';
+import { defaultSchema } from 'hast-util-sanitize';
+
+const customSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    div: [
+      ...(defaultSchema.attributes?.div || []),
+      ['className', 'mermaid'], // Allow mermaid class
+    ],
+  },
+};
 
 export default function MarkdownRenderer({ 
   content, 
@@ -47,81 +59,32 @@ export default function MarkdownRenderer({
   }, []);
 
   // Initialize mermaid when the component mounts
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    const initMermaid = async () => {
-      try {
-        const mermaid = (await import('mermaid')).default;
-        
-        mermaid.initialize({
-          startOnLoad: false, // Changed to false to prevent auto initialization
-          theme: darkMode ? 'dark' : 'default',
-          securityLevel: 'loose',
-          fontFamily: 'inherit',
-        });
-        
-        // Create a dedicated function for rendering Mermaid diagrams
-        const renderMermaidDiagrams = () => {
-          try {
-            // Find all mermaid divs that don't have an svg child (not yet rendered)
-            const mermaidDivs = document.querySelectorAll('div.mermaid:not(:has(svg))');
-            
-            if (mermaidDivs.length > 0) {
-              console.log(`Rendering ${mermaidDivs.length} Mermaid diagrams`);
-              
-              // Use run() instead of contentLoaded() for more reliable rendering
-              mermaid.run({
-                querySelector: 'div.mermaid:not(:has(svg))',
-              }).catch(err => {
-                console.error('Error rendering Mermaid diagrams:', err);
-              });
-            }
-          } catch (error) {
-            console.error('Error in renderMermaidDiagrams:', error);
-          }
-        };
-        
-        // Initial render
-        renderMermaidDiagrams();
-        
-        // Set up a MutationObserver to watch for DOM changes
-        const observer = new MutationObserver((mutations) => {
-          // Check if any mutations affect mermaid containers or their children
-          const shouldRerender = mutations.some(mutation => {
-            // Check if the mutation target is a mermaid container or contains one
-            return mutation.target.classList?.contains('mermaid') ||
-                   mutation.target.querySelector?.('.mermaid') ||
-                   [...(mutation.addedNodes || [])].some(node => 
-                     node.classList?.contains('mermaid') || 
-                     node.querySelector?.('.mermaid')
-                   );
-          });
-          
-          if (shouldRerender) {
-            // Schedule rendering in the next animation frame
-            window.requestAnimationFrame(renderMermaidDiagrams);
-          }
-        });
-        
-        // Start observing the document with the configured parameters
-        observer.observe(document.body, { 
-          childList: true, 
-          subtree: true,
-          attributes: true
-        });
-        
-        // Clean up the observer when the component unmounts
-        return () => {
-          observer.disconnect();
-        };
-      } catch (error) {
-        console.error('Error initializing mermaid:', error);
-      }
+useEffect(() => {
+  if (!isMounted) return;
+
+  import('mermaid').then(({ default: mermaid }) => {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: darkMode ? 'dark' : 'default',
+      securityLevel: 'loose',
+    });
+
+    const render = () => {
+      requestAnimationFrame(() => {
+        const nodes = document.querySelectorAll('div.mermaid:not(:has(svg))');
+        if (nodes.length > 0) {
+          mermaid.run({ querySelector: 'div.mermaid:not(:has(svg))' });
+        }
+      });
     };
-    
-    initMermaid();
-  }, [isMounted, darkMode]);
+
+    render();
+
+    const id = setTimeout(render, 300); // 2nd try
+    return () => clearTimeout(id);
+  });
+}, [isMounted, content, darkMode]); // <-- ensure content is part of deps
+
 
   // Process custom containers after ReactMarkdown has rendered
   useEffect(() => {
@@ -274,7 +237,11 @@ export default function MarkdownRenderer({
       {isMounted ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+          rehypePlugins={[
+            rehypeRaw,
+            [rehypeSanitize, customSchema],
+            rehypeKatex,
+          ]}
           components={{
             // Handle code blocks with syntax highlighting and Mermaid diagrams
             code({ node, inline, className, children, ...props }) {

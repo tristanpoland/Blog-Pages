@@ -810,12 +810,14 @@ And here's a mermaid diagram showing the process:
 
 ```mermaid
 graph TD
-    A[Input a, b, c] --> B{Calculate discriminant}
-    B -->|discriminant < 0| C[No real solutions]
-    B -->|discriminant = 0| D[One solution: -b/(2a)]
-    B -->|discriminant > 0| E[Two solutions]
-    E --> F["x1 = (-b + sqrt(discriminant))/(2a)"]
-    E --> G["x2 = (-b - sqrt(discriminant))/(2a)"]
+    A[Start] --> B{Is the discriminant < 0?}
+    B -->|Yes| C[No real solutions]
+    B -->|No| D{Is the discriminant = 0?}
+    D -->|Yes| E[One solution: -b / (2a)]
+    D -->|No| F[Two solutions: (-b ± sqrt(discriminant)) / (2a)]
+    C --> G[End]
+    E --> G
+    F --> G
 ```
 
 ## References and Resources
