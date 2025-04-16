@@ -195,6 +195,7 @@ Ready to go live? It's incredibly simple:
 
 1. Enable github pages in the `settings` tab of your repo:
 
+![{95E84BFC-7087-45FB-B38A-487C8D4B4318}](https://github.com/user-attachments/assets/4739e33a-0198-420d-9892-af0552b6a626)
 
 
 2. Push your changes to GitHub:
