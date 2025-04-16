@@ -6,7 +6,7 @@ const nextConfig = {
     unoptimized: true,
   },
   // Uncomment and update if not using custom domain
-  // basePath: '/repo-name',
+  basePath: '/Blog-Pages',
 }
 
 module.exports = nextConfig
