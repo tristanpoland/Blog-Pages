@@ -729,14 +729,14 @@ pie
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle
-    Idle --> Processing: Start
-    Processing --> Success: Complete
-    Processing --> Failed: Error
-    Success --> Idle: Reset
-    Failed --> Idle: Reset
-    Success --> [*]
-    Failed --> [*]
+    [*] --> "Idle"
+    "Idle" --> "Processing": Start
+    "Processing" --> "Success": Complete
+    "Processing" --> "Failed": Error
+    "Success" --> "Idle": Reset
+    "Failed" --> "Idle": Reset
+    "Success" --> [*]
+    "Failed" --> [*]
 ```
 
 ## Custom Containers
