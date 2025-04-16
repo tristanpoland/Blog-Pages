@@ -16,7 +16,7 @@ function SearchResults() {
     async function fetchResults() {
       setLoading(true);
       try {
-        const basePath ='..'
+        const basePath = process.env.NEXT_PUBLIC_CUSTOM_BASE_PATH || '';
         console.log('Fetching posts from:', `${basePath}/blog-index.json`);
         const res = await fetch(`${basePath}/blog-index.json`);
         const posts = await res.json();

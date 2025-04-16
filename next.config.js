@@ -6,7 +6,7 @@ const nextConfig = {
     unoptimized: true,
   },
   // Uncomment and update if not using custom domain
-  basePath: '/Blog-Pages',
+  basePath: process.env.NEXT_PUBLIC_CUSTOM_BASE_PATH
 }
 
 module.exports = nextConfig
