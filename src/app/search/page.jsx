@@ -16,7 +16,7 @@ function SearchResults() {
     async function fetchResults() {
       setLoading(true);
       try {
-        const res = await fetch('/blog-index.json');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/blog-index.json`);
         const posts = await res.json();
         
         // Simple search implementation
