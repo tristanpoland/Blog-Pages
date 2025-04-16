@@ -16,7 +16,7 @@ function SearchResults() {
     async function fetchResults() {
       setLoading(true);
       try {
-        const basePath ='../'
+        const basePath ='..'
         console.log('Fetching posts from:', `${basePath}/blog-index.json`);
         const res = await fetch(`${basePath}/blog-index.json`);
         const posts = await res.json();
