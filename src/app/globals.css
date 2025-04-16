@@ -394,3 +394,23 @@ pre[class*="language-"] {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   z-index: 10;
 }
+
+/* Add to your globals.css */
+.katex {
+  font-size: 1.1em !important;
+}
+
+.math-inline .katex {
+  padding: 0 0.2em;
+}
+
+.math-display {
+  overflow-x: auto;
+  margin: 1em 0;
+  padding: 0.5em 0;
+}
+
+/* Dark mode support for math */
+.dark-theme .katex {
+  color: #e4e4e7;
+}

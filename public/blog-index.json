@@ -1,5 +1,19 @@
 [
   {
+    "slug": "math-sample",
+    "title": "Advanced Mathematics Renderer Test",
+    "date": "2025-04-16",
+    "tags": [
+      "mathematics",
+      "renderer",
+      "test",
+      "LaTeX"
+    ],
+    "excerpt": "\r\n# Mathematics Renderer Test Document\r\n\r\nThis document is designed to test all the advanced features of our enhanced mathematics renderer. It contain...",
+    "readingTime": 4,
+    "fileName": "math-sample.md"
+  },
+  {
     "slug": "hello-world",
     "title": "Test",
     "date": "2025-03-25",

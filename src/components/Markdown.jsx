@@ -1,345 +1,344 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React, { useEffect, useState } from 'react';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import remarkRehype from 'remark-rehype';
 import rehypeKatex from 'rehype-katex';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus, prism } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import rehypeRaw from 'rehype-raw';
+import rehypeStringify from 'rehype-stringify';
+import rehypePrism from 'rehype-prism-plus';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeSanitize from 'rehype-sanitize';
-import slugify from 'slugify';
-import copy from 'copy-to-clipboard';
 import 'katex/dist/katex.min.css';
-import mermaid from 'mermaid';
+import 'prismjs/themes/prism-tomorrow.css';
+import { visit } from 'unist-util-visit';
 
-// Initialize mermaid
-if (typeof window !== 'undefined') {
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: 'default',
-    securityLevel: 'loose',
-    fontFamily: 'inherit',
-  });
-}
+// Import Prism - but don't access window during import
+import Prism from 'prismjs';
+
+// Core languages
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-csharp';
+import 'prismjs/components/prism-go';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-ruby';
+import 'prismjs/components/prism-php';
+import 'prismjs/components/prism-swift';
+import 'prismjs/components/prism-kotlin';
+import 'prismjs/components/prism-scala';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-graphql';
+import 'prismjs/components/prism-regex';
+
+// Safe browser-only functionality
+const isBrowser = typeof window !== 'undefined';
 
 export default function MarkdownRenderer({ 
   content, 
-  darkMode = true, 
-  sanitize = true,
-  footnotes = true,
-  tableOfContents = false,
-  copyable = true,
-  mathSupport = true,
-  customContainers = true,
-  mermaidSupport = true,
-  maxImageWidth = '100%',
-  maxImageHeight = 'auto',
-  highlightedLines = [] 
+  darkMode = true,
 }) {
-  const [copied, setCopied] = useState({});
-  const [headings, setHeadings] = useState([]);
+  const [html, setHtml] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
   
-  // If no content is provided, return null
-  if (!content) {
-    return null;
-  }
-  
-  // Parse content for headings to generate table of contents
+  // Set isMounted to true once component mounts (client-side only)
   useEffect(() => {
-    if (tableOfContents) {
-      const headingMatches = content.match(/^(#{1,6})\s+(.+)$/gm) || [];
-      const extractedHeadings = headingMatches.map(heading => {
-        const level = heading.match(/^(#{1,6})/)[0].length;
-        const text = heading.replace(/^#{1,6}\s+/, '');
-        const id = slugify(text, { lower: true });
-        return { level, text, id };
-      });
-      setHeadings(extractedHeadings);
-    }
-  }, [content, tableOfContents]);
-
-  // Choose syntax highlighting theme based on dark mode
-  const codeStyle = darkMode ? vscDarkPlus : prism;
-
-  // Handle copying code to clipboard
-  const handleCopyCode = useCallback((code, id) => {
-    copy(code);
-    
-    // Set the copied state for this specific code block
-    setCopied(prev => ({ 
-      ...prev, 
-      [id]: true 
-    }));
-    
-    // Reset after 2 seconds
-    setTimeout(() => {
-      setCopied(prev => ({ 
-        ...prev, 
-        [id]: false 
-      }));
-    }, 2000);
+    setIsMounted(true);
   }, []);
-
-  // Generate plugins array based on props
-  const remarkPlugins = [remarkGfm];
-  const rehypePlugins = [rehypeRaw];
   
-  // Add math support
-  if (mathSupport) {
-    remarkPlugins.push(remarkMath);
-    rehypePlugins.push(rehypeKatex);
-  }
-  
-  if (sanitize) {
-    rehypePlugins.push(rehypeSanitize);
-  }
-
-  // Mermaid diagram rendering
+  // Initialize PrismJS - only in browser
   useEffect(() => {
-    if (mermaidSupport && typeof window !== 'undefined') {
-      try {
-        mermaid.contentLoaded();
-      } catch (e) {
-        console.error('Mermaid rendering error:', e);
-      }
+    if (!isMounted) return;
+    
+    // Safe to access window/document here
+    try {
+      // Log available languages - only in browser
+      console.log('Available languages:', Object.keys(Prism.languages));
+      
+      // Apply highlighting to any existing code
+      Prism.highlightAll();
+    } catch (error) {
+      console.error('Error initializing Prism:', error);
     }
-  }, [content, mermaidSupport]);
+  }, [isMounted]);
 
-  // Custom containers processing
   useEffect(() => {
-    if (customContainers && typeof window !== 'undefined') {
-      // Process custom containers after rendering
-      const markdownContent = document.querySelector('.markdown-content');
-      if (markdownContent) {
-        // Find all container start markers like ::: info
-        const containerStarts = Array.from(markdownContent.querySelectorAll('p'))
-          .filter(p => /^:::(\s+)?([a-zA-Z0-9_-]+)/.test(p.textContent.trim()));
+    if (!content) return;
+    
+    const processMarkdown = async () => {
+      try {
+        // Create a remark plugin to handle mermaid code blocks
+        function remarkMermaid() {
+          return (tree) => {
+            const mermaidBlocks = [];
+            let mermaidCounter = 0;
+            
+            // Visit all code blocks in the AST
+            visit(tree, 'code', (node) => {
+              // Check if this is a mermaid code block
+              if (node.lang === 'mermaid') {
+                // Generate a unique ID for this mermaid diagram
+                const id = `mermaid-${mermaidCounter++}`;
+                
+                // Store the mermaid code for later processing
+                mermaidBlocks.push({ id, code: node.value.trim() });
+                
+                // Replace the code node with a HTML node containing a placeholder
+                node.type = 'html';
+                node.value = `<div class="mermaid-diagram" data-diagram-id="${id}" data-diagram-code="${encodeURIComponent(node.value.trim())}"></div>`;
+                
+                // Remove the language property to prevent further processing by rehype-prism
+                delete node.lang;
+              }
+              // Ensure other code blocks have a language
+              else if (!node.lang) {
+                node.lang = 'text';
+              }
+            });
+            
+            // Store the mermaid blocks in the tree.data
+            tree.data = tree.data || {};
+            tree.data.mermaidBlocks = mermaidBlocks;
+          };
+        }
         
-        containerStarts.forEach(startP => {
-          const type = startP.textContent.trim().match(/^:::(\s+)?([a-zA-Z0-9_-]+)/)[2];
-          let currentNode = startP.nextSibling;
-          const nodesToWrap = [];
-          
-          // Collect all nodes until we find the closing marker
-          while (currentNode) {
-            if (currentNode.nodeType === 1 && 
-                currentNode.tagName === 'P' && 
-                currentNode.textContent.trim() === ':::') {
-              // Found the closing marker
-              const endNode = currentNode;
-              // Remove start and end markers
-              startP.remove();
-              endNode.remove();
-              
-              // Create container
-              const container = document.createElement('div');
-              container.className = `custom-container custom-container-${type}`;
-              container.setAttribute('data-type', type);
-              
-              // Add title if appropriate
-              const title = document.createElement('div');
-              title.className = 'custom-container-title';
-              title.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-              container.appendChild(title);
-              
-              // Add content
-              const content = document.createElement('div');
-              content.className = 'custom-container-content';
-              nodesToWrap.forEach(node => content.appendChild(node));
-              container.appendChild(content);
-              
-              // Insert container into DOM
-              startP.parentNode.insertBefore(container, currentNode);
-              break;
-            } else {
-              // Add this node to the list to wrap
-              const nextNode = currentNode.nextSibling;
-              nodesToWrap.push(currentNode);
-              currentNode = nextNode;
+        const processor = unified()
+          .use(remarkParse)
+          .use(remarkGfm)
+          .use(remarkMath)
+          .use(remarkMermaid) // Add our custom plugin
+          .use(remarkRehype, { allowDangerousHtml: true })
+          .use(rehypeSanitize, {
+            // Allow our mermaid placeholders
+            extend: [
+              {
+                tagNames: ['div'],
+                attributes: {
+                  'class': ['mermaid-diagram'],
+                  'data-diagram-id': [/.*/],
+                  'data-diagram-code': [/.*/]
+                }
+              }
+            ]
+          })
+          .use(rehypeKatex, { 
+            throwOnError: false,
+            errorColor: '#FF6188',
+            trust: true,
+            strict: false,
+            output: 'htmlAndMathml',
+            macros: {
+              "\\R": "\\mathbb{R}",
+              "\\N": "\\mathbb{N}",
+              "\\Z": "\\mathbb{Z}",
+              "\\Q": "\\mathbb{Q}",
+              "\\C": "\\mathbb{C}",
             }
-          }
+          })
+          .use(rehypePrism, {
+            ignoreMissing: true, // Skip unknown languages
+          })
+          .use(rehypeSlug)
+          .use(rehypeAutolinkHeadings)
+          .use(rehypeStringify, { allowDangerousHtml: true });
+          
+        const result = await processor.process(content);
+          
+        // Get mermaid blocks from the result data
+        const mermaidBlocks = result.data.mermaidBlocks || [];
+        
+        // Process custom containers
+        let htmlContent = String(result);
+        const containerRegex = /<p>:::\s*(\w+)([\s\S]*?):::<\/p>/g;
+        
+        htmlContent = htmlContent.replace(containerRegex, (match, type, content) => {
+          return `<div class="custom-block custom-block-${type}">
+                    <div class="custom-block-title">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                    <div class="custom-block-content">${content.trim()}</div>
+                  </div>`;
+        });
+        
+        // Store the HTML and mermaid blocks
+        setHtml({ content: htmlContent, mermaidBlocks });
+      } catch (error) {
+        console.error('Error rendering markdown:', error);
+        setHtml({ 
+          content: `<p>Error rendering markdown: ${error.message}</p>`, 
+          mermaidBlocks: [] 
         });
       }
+    };
+    
+    processMarkdown();
+  }, [content]);
+  
+  // Initialize mermaid and render diagrams - only in browser and when component is mounted
+  useEffect(() => {
+    if (!isMounted || !html?.content || !html?.mermaidBlocks?.length) return;
+    
+    const renderMermaidDiagrams = async () => {
+      try {
+        // Dynamic import of mermaid (only on client)
+        const mermaid = (await import('mermaid')).default;
+        
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: darkMode ? 'dark' : 'default',
+          securityLevel: 'loose',
+          fontFamily: 'inherit',
+        });
+        
+        // Find all mermaid diagram containers
+        const diagrams = document.querySelectorAll('.mermaid-diagram');
+        
+        for (const diagram of diagrams) {
+          try {
+            const code = decodeURIComponent(diagram.getAttribute('data-diagram-code'));
+            const id = diagram.getAttribute('data-diagram-id');
+            
+            // Render the diagram
+            const { svg } = await mermaid.render(`mermaid-svg-${id}`, code);
+            diagram.innerHTML = svg;
+          } catch (error) {
+            console.error('Error rendering mermaid diagram:', error);
+            diagram.innerHTML = `<pre class="error">Error rendering diagram: ${error.message}</pre>`;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading mermaid:', error);
+      }
+    };
+    
+    renderMermaidDiagrams();
+    
+    // Also ensure Prism highlight is applied
+    if (typeof Prism !== 'undefined') {
+      setTimeout(() => {
+        Prism.highlightAll();
+      }, 100);
     }
-  }, [content, customContainers]);
-
+  }, [html, isMounted, darkMode]);
+  
   return (
     <div className={`markdown-content ${darkMode ? 'dark-theme' : 'light-theme'}`}>
-      {tableOfContents && headings.length > 0 && (
-        <div className="table-of-contents mb-6 p-4 border rounded bg-gray-50 dark:bg-gray-800">
-          <h2 className="text-lg font-semibold mb-2">Table of Contents</h2>
-          <ul className="toc-list">
-            {headings.map((heading, index) => (
-              <li 
-                key={index} 
-                style={{ marginLeft: `${(heading.level - 1) * 1}rem` }}
-                className="py-1"
-              >
-                <a 
-                  href={`#${heading.id}`} 
-                  className="text-blue-600 hover:underline"
-                >
-                  {heading.text}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div 
+        className="prose prose-lg dark:prose-invert max-w-none" 
+        dangerouslySetInnerHTML={{ __html: html ? html.content : '' }}
+      />
       
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={{
-          // Handle code blocks with syntax highlighting and Mermaid diagrams
-          code({ node, inline, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '');
-            const language = match ? match[1] : null;
-            const codeContent = String(children).replace(/\n$/, '');
-            const codeId = `code-${Math.random().toString(36).substring(2, 9)}`;
-            
-            // Handle Mermaid diagrams
-            if (mermaidSupport && language === 'mermaid') {
-              return (
-                <div className="mermaid-diagram-container">
-                  <div className="mermaid">{codeContent}</div>
-                </div>
-              );
-            }
-            
-            // Check if this code block should have highlighted lines
-            const shouldHighlight = highlightedLines.some(h => 
-              (h.language === language) && h.lines && h.lines.length
-            );
-            
-            const lineProps = shouldHighlight ? (lineNumber) => {
-              const highlight = highlightedLines
-                .filter(h => h.language === language)
-                .some(h => h.lines.includes(lineNumber));
-                
-              return {
-                style: highlight ? { 
-                  backgroundColor: 'rgba(255, 255, 0, 0.2)', 
-                  display: 'block',
-                  width: '100%'
-                } : {},
-                className: highlight ? 'highlighted-line' : ''
-              };
-            } : undefined;
-
-            return !inline && language ? (
-              <div className="code-block-container relative">
-                <div className="code-header flex justify-between items-center px-3 py-1 bg-gray-800 text-white rounded-t">
-                  <span className="language-badge text-xs">{language}</span>
-                  {copyable && (
-                    <button
-                      onClick={() => handleCopyCode(codeContent, codeId)}
-                      className="copy-button text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"
-                    >
-                      {copied[codeId] ? 'Copied!' : 'Copy'}
-                    </button>
-                  )}
-                </div>
-                <SyntaxHighlighter
-                  style={codeStyle}
-                  language={language}
-                  PreTag="div"
-                  showLineNumbers={language !== 'markdown'}
-                  wrapLines={shouldHighlight}
-                  lineProps={lineProps}
-                  {...props}
-                >
-                  {codeContent}
-                </SyntaxHighlighter>
-              </div>
-            ) : (
-              <code className={`${className} bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded`} {...props}>
-                {children}
-              </code>
-            );
-          },
-          // Headings with anchor links for table of contents
-          h1: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h1 id={id} className="text-3xl font-bold my-4 scroll-mt-16" {...props}>{children}</h1>;
-          },
-          h2: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h2 id={id} className="text-2xl font-bold my-3 scroll-mt-16" {...props}>{children}</h2>;
-          },
-          h3: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h3 id={id} className="text-xl font-bold my-2 scroll-mt-16" {...props}>{children}</h3>;
-          },
-          h4: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h4 id={id} className="text-lg font-bold my-2 scroll-mt-16" {...props}>{children}</h4>;
-          },
-          h5: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h5 id={id} className="text-md font-bold my-2 scroll-mt-16" {...props}>{children}</h5>;
-          },
-          h6: ({ node, children, ...props }) => {
-            const id = tableOfContents ? slugify(String(children), { lower: true }) : undefined;
-            return <h6 id={id} className="text-sm font-bold my-2 scroll-mt-16" {...props}>{children}</h6>;
-          },
-          // Other basic elements
-          p: ({ node, ...props }) => <p className="my-2" {...props} />,
-          a: ({ node, href, ...props }) => {
-            const isInternal = href && href.startsWith('#');
-            return (
-              <a 
-                className={`${isInternal ? 'text-blue-500' : 'text-blue-600'} hover:underline`} 
-                href={href}
-                target={!isInternal && href && href.startsWith('http') ? '_blank' : undefined}
-                rel={!isInternal && href && href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                {...props} 
-              />
-            );
-          },
-          ul: ({ node, ...props }) => <ul className="list-disc pl-6 my-2" {...props} />,
-          ol: ({ node, ...props }) => <ol className="list-decimal pl-6 my-2" {...props} />,
-          li: ({ node, ...props }) => <li className="my-1" {...props} />,
-          blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-4 border-gray-300 pl-4 my-2 italic bg-gray-50 dark:bg-gray-800 py-2" {...props} />
-          ),
-          // Tables
-          table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-4">
-              <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600" {...props} />
-            </div>
-          ),
-          thead: ({ node, ...props }) => <thead className="bg-gray-100 dark:bg-gray-700" {...props} />,
-          tbody: ({ node, ...props }) => <tbody {...props} />,
-          tr: ({ node, ...props }) => <tr className="border-b border-gray-300 dark:border-gray-600" {...props} />,
-          th: ({ node, ...props }) => <th className="px-4 py-2 text-left font-semibold border-r border-gray-300 dark:border-gray-600 last:border-r-0" {...props} />,
-          td: ({ node, ...props }) => <td className="px-4 py-2 border-r border-gray-300 dark:border-gray-600 last:border-r-0" {...props} />,
-          // Images
-          img: ({ node, src, alt, ...props }) => (
-            <img 
-              className="my-2 rounded" 
-              src={src} 
-              alt={alt || ''} 
-              style={{ 
-                maxWidth: maxImageWidth, 
-                maxHeight: maxImageHeight,
-                display: 'block',
-                margin: '1rem auto' 
-              }} 
-              loading="lazy"
-              {...props} 
-            />
-          ),
-          // Other basic elements
-          hr: ({ node, ...props }) => <hr className="my-6 border-t border-gray-300 dark:border-gray-600" {...props} />,
-          em: ({ node, ...props }) => <em className="italic" {...props} />,
-          strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
-        }}
-      >
-        {content}
-      </ReactMarkdown>
+      <style jsx global>{`
+        /* Math styling */
+        .katex {
+          font-size: 1.1em !important;
+          font-family: 'KaTeX_Main', serif;
+        }
+        
+        .katex-display {
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 1em 0;
+          margin: 1.2em 0 !important;
+        }
+        
+        .dark-theme .katex {
+          color: #e4e4e7;
+        }
+        
+        /* Mermaid styling */
+        .mermaid-diagram {
+          margin: 1.5em 0;
+          text-align: center;
+          background-color: ${darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'};
+          padding: 1em;
+          border-radius: 0.5em;
+          min-height: 50px;
+        }
+        
+        /* Code block styling */
+        pre[class*="language-"] {
+          margin: 1.5em 0;
+          border-radius: 0.5em;
+          overflow: auto;
+          background: ${darkMode ? '#282a36' : '#f8f8f2'} !important;
+        }
+        
+        code[class*="language-"] {
+          font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+          text-shadow: none;
+        }
+        
+        /* Explicit token styling for backup if Prism fails */
+        .token.comment { color: #6272a4; }
+        .token.string { color: ${darkMode ? '#f1fa8c' : '#a6e22e'}; }
+        .token.number { color: #bd93f9; }
+        .token.keyword { color: #ff79c6; }
+        .token.function { color: #8be9fd; }
+        .token.boolean { color: #bd93f9; }
+        .token.operator { color: #ff79c6; }
+        .token.punctuation { color: #f8f8f2; }
+        
+        /* Line numbers */
+        .line-numbers .line-numbers-rows {
+          border-right: 3px solid #6272a4;
+        }
+        
+        /* Custom containers */
+        .custom-block {
+          margin: 1.5em 0;
+          padding: 1em;
+          border-left: 4px solid;
+          border-radius: 0.25em;
+        }
+        
+        .custom-block-title {
+          font-weight: bold;
+          margin-bottom: 0.5em;
+        }
+        
+        .custom-block.custom-block-info { 
+          border-color: #3498db; 
+          background-color: ${darkMode ? 'rgba(52, 152, 219, 0.2)' : 'rgba(52, 152, 219, 0.1)'}; 
+        }
+        .custom-block.custom-block-warning { 
+          border-color: #f39c12; 
+          background-color: ${darkMode ? 'rgba(243, 156, 18, 0.2)' : 'rgba(243, 156, 18, 0.1)'}; 
+        }
+        .custom-block.custom-block-danger { 
+          border-color: #e74c3c; 
+          background-color: ${darkMode ? 'rgba(231, 76, 60, 0.2)' : 'rgba(231, 76, 60, 0.1)'}; 
+        }
+        .custom-block.custom-block-tip { 
+          border-color: #2ecc71; 
+          background-color: ${darkMode ? 'rgba(46, 204, 113, 0.2)' : 'rgba(46, 204, 113, 0.1)'}; 
+        }
+        .custom-block.custom-block-success { 
+          border-color: #2ecc71; 
+          background-color: ${darkMode ? 'rgba(46, 204, 113, 0.2)' : 'rgba(46, 204, 113, 0.1)'}; 
+        }
+        
+        /* Error styling */
+        .error {
+          color: #e74c3c;
+          padding: 0.5em;
+          background-color: rgba(231, 76, 60, 0.1);
+          border-radius: 0.3em;
+        }
+      `}</style>
     </div>
   );
 }
